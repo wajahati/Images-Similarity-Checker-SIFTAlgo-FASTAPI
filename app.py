@@ -44,21 +44,23 @@ def compare_images(img1, img2):
 
 def are_images_similar(url_list1, url_list2):
     threshold = 50
+    similar_images = []
     for url1 in url_list1:
         img1 = download_image(url1)
         for url2 in url_list2:
             img2 = download_image(url2)
             num_good_matches = compare_images(img1, img2)
             if num_good_matches > threshold:
+                similar_images.append((url1, url2))
                 del img1
                 del img2
                 gc.collect()
-                return True
+                return similar_images
             del img2
             gc.collect()
         del img1
         gc.collect()
-    return False
+    return similar_images
 
 @app.post('/similarityCheck')
 def profanityCheck(data:Similarity):
@@ -71,7 +73,7 @@ def profanityCheck(data:Similarity):
         proImgs.append(nm)
     
     result = are_images_similar(inpImgs, proImgs)
-    output_dict = {"similarity": result}
+    output_dict = {"similarity": len(similar_images) > 0, "similar_images": similar_images}
     return JSONResponse(content=output_dict)
 
 
