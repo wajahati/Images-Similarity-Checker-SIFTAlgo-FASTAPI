@@ -73,7 +73,7 @@ def profanityCheck(data:Similarity):
         proImgs.append(nm)
     
     result = are_images_similar(inpImgs, proImgs)
-    output_dict = {"similarity": len(similar_images) > 0, "similar_images": similar_images}
+    output_dict = {"similarity": len(result) > 0, "similar_images": result}
     return JSONResponse(content=output_dict)
 
 
