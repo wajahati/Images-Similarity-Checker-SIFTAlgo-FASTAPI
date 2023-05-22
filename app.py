@@ -1,17 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun May 14 02:11:08 2023
-
-@author: mr.laptop
-"""
-
-# 1. Library imports
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from API import Similarity
-
-
 import cv2
 import numpy as np
 import gc
@@ -21,26 +11,22 @@ from PIL import Image
 
 app = FastAPI()
 
-
-def download_image(url):
+def download_image(url, max_size=800):
     response = requests.get(url)
     img = Image.open(BytesIO(response.content))
+    img.thumbnail((max_size, max_size), Image.ANTIALIAS)
     return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
 def compare_images(img1, img2):
-    sift = cv2.SIFT_create()
-    kp1, des1 = sift.detectAndCompute(img1, None)
-    kp2, des2 = sift.detectAndCompute(img2, None)
+    orb = cv2.ORB_create()
+    kp1, des1 = orb.detectAndCompute(img1, None)
+    kp2, des2 = orb.detectAndCompute(img2, None)
 
-    bf = cv2.BFMatcher()
-    matches = bf.knnMatch(des1, des2, k=2)
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    matches = bf.match(des1, des2)
+    matches = sorted(matches, key=lambda x: x.distance)
 
-    good_matches = []
-    for m, n in matches:
-        if m.distance < 0.75 * n.distance:
-            good_matches.append([m])
-
-    return len(good_matches)
+    return len(matches)
 
 def are_images_similar(url_list1, url_list2):
     threshold = 50
@@ -52,32 +38,20 @@ def are_images_similar(url_list1, url_list2):
             num_good_matches = compare_images(img1, img2)
             if num_good_matches > threshold:
                 similar_images.append((url1, url2))
-                del img1
-                del img2
-                gc.collect()
-                return similar_images
-            del img2
+            img2 = None
             gc.collect()
-        del img1
+        img1 = None
         gc.collect()
     return similar_images
 
 @app.post('/similarityCheck')
 def profanityCheck(data:Similarity):
-    inpImgs = []
-    proImgs = []
-    
-    for nm in data.inpImg:
-        inpImgs.append(nm)
-    for nm in data.proImg:
-        proImgs.append(nm)
+    inpImgs = data.inpImg
+    proImgs = data.proImg
     
     result = are_images_similar(inpImgs, proImgs)
     output_dict = {"similarity": len(result) > 0, "similar_images": result}
     return JSONResponse(content=output_dict)
 
-
-# 5. Run the API with uvicorn
-#    Will run on http://127.0.0.1:8000
 if __name__ == '__main__':
     uvicorn.run(app, host='127.0.0.1', port=8000)
